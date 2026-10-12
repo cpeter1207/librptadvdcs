@@ -1,0 +1,3 @@
+usr/include/rptadvdcs/rptadvdcs.h
+usr/lib/*/librptadvdcs.so
+usr/lib/*/pkgconfig/rptadvdcs.pc
