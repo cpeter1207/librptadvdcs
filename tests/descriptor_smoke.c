@@ -24,16 +24,19 @@ int main(void) {
   struct rptadv_dcs_receive *rx = NULL;
   struct rptadv_dcs_transmit *whole = NULL;
   struct rptadv_dcs_transmit *split = NULL;
+  struct rptadv_dcs_transmit *reference_new = NULL;
   struct rptadv_dcs_transmit *prepared = NULL;
   assert(api->receive_create(&rx) == RPTADV_DCS_OK && rx);
   assert(api->transmit_create(&whole) == RPTADV_DCS_OK && whole);
   assert(api->transmit_create(&split) == RPTADV_DCS_OK && split);
+  assert(api->transmit_create(&reference_new) == RPTADV_DCS_OK && reference_new);
   assert(api->transmit_create(&prepared) == RPTADV_DCS_OK && prepared);
   assert(api->receive_configure(rx, 023, 0) == RPTADV_DCS_OK);
   assert(api->receive_enabled(rx) == 1);
   assert(api->transmit_configure(whole, 023, 0) == RPTADV_DCS_OK);
   assert(api->transmit_configure(split, 023, 0) == RPTADV_DCS_OK);
-  assert(api->transmit_configure(prepared, 023, 0) == RPTADV_DCS_OK);
+  assert(api->transmit_configure(reference_new, 025, 1) == RPTADV_DCS_OK);
+  assert(api->transmit_configure(prepared, 025, 1) == RPTADV_DCS_OK);
 
   float expected[9217];
   float actual[9217];
@@ -47,12 +50,17 @@ int main(void) {
   }
   assert(memcmp(expected, actual, sizeof(expected)) == 0);
   assert(expected[0] == 0.25f);
+  assert(api->transmit_generate(reference_new, expected, 9217, 0.25f, 1, 0) ==
+         RPTADV_DCS_OK);
   assert(api->transmit_update_config_from(split, prepared) == RPTADV_DCS_OK);
-  assert(api->transmit_generate(whole, expected, 9217, 0.25f, 1, 0) ==
+  assert(api->transmit_generate(reference_new, expected, 9217, 0.25f, 1, 0) ==
          RPTADV_DCS_OK);
   assert(api->transmit_generate(split, actual, 9217, 0.25f, 1, 0) ==
          RPTADV_DCS_OK);
   assert(memcmp(expected, actual, sizeof(expected)) == 0);
+  assert(api->transmit_generate(whole, actual, 9217, 0.25f, 1, 0) ==
+         RPTADV_DCS_OK);
+  assert(memcmp(expected, actual, sizeof(expected)) != 0);
 
   float stereo[48000 * 2];
   const uint32_t wire_word = 0x763813;
@@ -100,6 +108,7 @@ int main(void) {
   api->receive_destroy(rx);
   api->transmit_destroy(whole);
   api->transmit_destroy(split);
+  api->transmit_destroy(reference_new);
   api->transmit_destroy(prepared);
   api->receive_destroy(NULL);
   api->transmit_destroy(NULL);

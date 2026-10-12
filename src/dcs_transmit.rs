@@ -226,10 +226,13 @@ mod tests {
     fn shared_dcs_reload_preserves_phase_and_bit_accumulator() {
         let mut uninterrupted = TransmitState::default();
         let mut updated = TransmitState::default();
+        let mut reference_new = TransmitState::default();
         let mut prepared = TransmitState::default();
-        for state in [&mut uninterrupted, &mut updated, &mut prepared] {
+        for state in [&mut uninterrupted, &mut updated] {
             state.configure(0o023, 0);
         }
+        reference_new.configure(0o025, 1);
+        prepared.configure(0o025, 1);
         let digital = GenerateConfig {
             peak: 0.1,
             enabled: 1,
@@ -239,6 +242,7 @@ mod tests {
         for _ in 0..37 {
             unsafe { generate(&mut uninterrupted, prefix.as_mut_ptr(), 8, digital) };
             unsafe { generate(&mut updated, prefix.as_mut_ptr(), 8, digital) };
+            unsafe { generate(&mut reference_new, prefix.as_mut_ptr(), 8, digital) };
         }
         let tail = GenerateConfig {
             turnoff: 1,
@@ -246,12 +250,14 @@ mod tests {
         };
         unsafe { generate(&mut uninterrupted, prefix.as_mut_ptr(), 8, tail) };
         unsafe { generate(&mut updated, prefix.as_mut_ptr(), 8, tail) };
+        unsafe { generate(&mut reference_new, prefix.as_mut_ptr(), 8, tail) };
         let before = (
             updated.phase,
             updated.bit_accumulator,
             updated.tail_phase_radians,
         );
         updated.update_config_from(&prepared);
+        assert_eq!((updated.code, updated.inverted), (0o025, true));
         assert_eq!(
             (
                 updated.phase,
@@ -262,14 +268,24 @@ mod tests {
         );
         let mut expected = [0.0; 1600];
         let mut actual = [0.0; 1600];
+        let mut old = [0.0; 1600];
         for (expected_block, actual_block) in expected.chunks_mut(8).zip(actual.chunks_mut(8)) {
             unsafe {
-                generate(&mut uninterrupted, expected_block.as_mut_ptr(), 8, digital);
+                generate(&mut reference_new, expected_block.as_mut_ptr(), 8, digital);
                 generate(&mut updated, actual_block.as_mut_ptr(), 8, digital);
             }
         }
+        unsafe {
+            generate(
+                &mut uninterrupted,
+                old.as_mut_ptr(),
+                old.len() as u32,
+                digital,
+            )
+        };
         assert_eq!(actual, expected);
-        assert_eq!(updated.phase, uninterrupted.phase);
-        assert_eq!(updated.bit_accumulator, uninterrupted.bit_accumulator);
+        assert_ne!(actual, old);
+        assert_eq!(updated.phase, reference_new.phase);
+        assert_eq!(updated.bit_accumulator, reference_new.bit_accumulator);
     }
 }
